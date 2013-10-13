@@ -1,4 +1,4 @@
 goraptor
 ========
 
-A RFC 5053 implement written by go .
+A RFC 5053 implement written by go.
