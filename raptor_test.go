@@ -1,6 +1,7 @@
 package goraptor
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -85,7 +86,7 @@ func TestRaptorEncode(t *testing.T) {
 	//Initialize
 	raptor := New(k)
 	for i, v := range src {
-		raptor.append(i, v)
+		raptor.Append(i, v)
 	}
 	raptor.Encode()
 
@@ -131,7 +132,7 @@ func TestRaptorDecode(t *testing.T) {
 		if data[1] == 1 {
 			continue
 		}
-		raptor.append(esi, data[:1])
+		raptor.Append(esi, data[:1])
 	}
 	if err := raptor.Decode(); err != nil {
 		t.Errorf("Decode failed, error is %s.", err.Error())
@@ -145,6 +146,41 @@ func TestRaptorDecode(t *testing.T) {
 		}
 		if sym[0] != symbols[esi][0] {
 			t.Errorf("Expect %v at %v for symbol, but got %v.", symbols[esi][0], esi, sym[0])
+		}
+	}
+}
+
+func TestRaptorEncodeAndDecode(t *testing.T) {
+	symbols := make([][]byte, 128)
+	for idx := range symbols {
+		symbols[idx] = make([]byte, 1024)
+		for offset := 0; offset < len(symbols[idx]); offset++ {
+			symbols[idx][offset] = byte(idx + offset)
+		}
+	}
+
+	k := len(symbols)
+	encoder := New(k)
+	for esi, data := range symbols {
+		encoder.Append(esi, data)
+	}
+	encoder.Encode()
+
+	decoder := New(k)
+	for esi := 0; esi < 2*k; esi++ {
+		if esi%3 == 0 {
+			continue
+		}
+		sym, _ := encoder.Symbol(esi)
+		decoder.Append(esi, sym)
+	}
+	decoder.Decode()
+
+	for esi, data := range symbols {
+		sym, _ := decoder.Symbol(esi)
+		if !bytes.Equal(data, sym) {
+			t.Errorf("Expect %v at %v for symbol, but got %v.", data, esi, sym)
+			break
 		}
 	}
 }

@@ -1,23 +1,16 @@
 package goraptor
 
 import (
-//	"fmt"
+	"errors"
+	"fmt"
 )
 
 const MaxDupFactor = 3
 
-type Error struct {
-	errstr string
-}
-
-func (err *Error) Error() string {
-	return err.errstr
-}
-
 var (
-	EINVAL       = &Error{"Invalid argument"}
-	ENeedMore    = &Error{"Need More data to decode"}
-	EBufferSmall = &Error{"Buffer is too small"}
+	EINVAL       = errors.New("Invalid argument")
+	ENeedMore    = errors.New("Need More data to decode")
+	EBufferSmall = errors.New("Buffer is too small")
 )
 
 type Raptor struct {
@@ -40,12 +33,12 @@ func New(k int) *Raptor {
 	var raptor *Raptor = new(Raptor)
 	raptor.k = k
 	raptor.p = getParameters(k)
-	raptor.data = make([][]byte, MaxDupFactor * k)
+	raptor.data = make([][]byte, MaxDupFactor*k)
 	return raptor
 }
 
-func (raptor *Raptor) append(esi int, data []byte) error {
-	if esi < 0 || esi >= MaxDupFactor * raptor.k || data == nil {
+func (raptor *Raptor) Append(esi int, data []byte) error {
+	if esi < 0 || esi >= MaxDupFactor*raptor.k || data == nil {
 		return EINVAL
 	}
 	if raptor.blockLen == 0 {
@@ -64,41 +57,58 @@ func (raptor *Raptor) append(esi int, data []byte) error {
 }
 
 func (raptor *Raptor) Symbol(esi int) ([]byte, error) {
-	if esi < 0 || esi >= MaxDupFactor * raptor.k {
+	if esi < 0 || esi >= MaxDupFactor*raptor.k {
 		return nil, EINVAL
 	}
 
-	if raptor.data[esi] == nil {
-		p := raptor.p
-		d, a, b := p.lt_triple(esi)
-
-		for ; b >= p.l; b = (b + a) % raptor.p.lPrime {
-		}
-
-		if d > p.l {
-			d = p.l
-		}
-
-		data := make([]byte, raptor.blockLen)
-		copy(data, raptor.c[b])
-
-		for i := 1; i < d; i++ {
-			b = (b + a) % p.lPrime
-			for ; b >= p.l; b = (b + a) % p.lPrime {
-			}
-			for j := range data {
-				data[j] ^= raptor.c[b][j]
-			}
-		}
-		raptor.data[esi] = data
+	if esi < raptor.k && raptor.data[esi] != nil {
+		return raptor.data[esi], nil
 	}
+	//	if raptor.data[esi] == nil {
+	p := raptor.p
+	d, a, b := p.lt_triple(esi)
+
+	for ; b >= p.l; b = (b + a) % raptor.p.lPrime {
+	}
+
+	if d > p.l {
+		d = p.l
+	}
+
+	var data []byte
+	if raptor.data[esi] == nil {
+		raptor.data[esi] = make([]byte, raptor.blockLen)
+	}
+	data = raptor.data[esi]
+	if len(data) != len(raptor.c[b]) {
+		str := fmt.Sprintf("Length unmatch. data is %v, c[%v] is %v.", len(data), b, len(raptor.c[b]))
+		return nil, errors.New(str)
+	}
+	copy(data, raptor.c[b])
+
+	for i := 1; i < d; i++ {
+		b = (b + a) % p.lPrime
+		for ; b >= p.l; b = (b + a) % p.lPrime {
+		}
+		for j := range data {
+			data[j] ^= raptor.c[b][j]
+		}
+	}
+
+	//	}
 
 	return raptor.data[esi], nil
 }
 
 func (raptor *Raptor) Encode() error {
-	if raptor.dataCnt != raptor.k {
-		return EINVAL
+	if raptor.dataCnt < raptor.k {
+		return ENeedMore
+	}
+	for i := 0; i < raptor.k; i++ {
+		//The source symbols must have been appended.
+		if raptor.data[i] == nil {
+			return ENeedMore
+		}
 	}
 
 	raptor.p.initAi()
@@ -132,8 +142,8 @@ func (raptor *Raptor) Decode() error {
 	// Matrix A for decode
 	ad := make([][]uint8, raptor.dataCnt+sh)
 	temp := make([][]byte, raptor.dataCnt+sh)
-	for i := range ad {
-		temp[i] = make([]byte, raptor.dataCnt)
+	for i := 0; i < raptor.dataCnt+sh; i++ {
+		temp[i] = make([]byte, raptor.blockLen)
 		ad[i] = make([]uint8, raptor.p.l)
 		if i < sh {
 			copy(ad[i], raptor.p.a[i])
@@ -170,14 +180,15 @@ func (raptor *Raptor) Decode() error {
 			}
 			if ad[i][k] == 1 {
 				xorRow(ad[i], ad[k])
-				for j := 0; j < raptor.blockLen; j++ {
-					temp[i][j] ^= temp[k][j]
-				}
+				xorRow(temp[i], temp[k])
+				//				for j := 0; j < raptor.blockLen; j++ {
+				//					temp[i][j] ^= temp[k][j]
+				//				}
 			}
 		}
 	}
 	raptor.c = make([][]byte, raptor.p.l)
-	for i := range raptor.c {
+	for i := 0; i < raptor.p.l; i++ {
 		raptor.c[i] = temp[i]
 	}
 
