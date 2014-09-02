@@ -23,6 +23,24 @@ func (p *parameters) g_ldpc() {
 	}
 }
 
+func (p *parameters) ldpc_as() {
+	var a, b int
+	for i := 0; i < p.k; i++ {
+		a = 1 + int(math.Floor(float64(i)/float64(p.s)))%(p.s-1)
+		b = i % p.s
+		p.as.Set(b, i)
+
+		b = (b + a) % p.s
+		p.as.Set(b, i)
+		b = (b + a) % p.s
+		p.as.Set(b, i)
+	}
+
+	for i := 0; i < p.s; i++ {
+		p.as.Set(i, i+p.k)
+	}
+}
+
 func countOne(i int) int {
 	var cnt int = 0
 	for ; i > 0; i >>= 1 {
@@ -69,6 +87,20 @@ func (p *parameters) g_half() {
 	}
 }
 
+func (p *parameters) half_as() {
+	seqM := genSeqM(p.k+p.s, int(math.Ceil(float64(p.h)/2.0)))
+	for i := 0; i < p.h; i++ {
+		//G_Half
+		for j := 0; j < p.k+p.s; j++ {
+			if (1<<uint(i))&seqM[j] != 0 {
+				p.as.Set(p.s+i, j)
+			}
+		}
+		//I_H
+		p.as.Set(p.s+i, p.k+p.s+i)
+	}
+}
+
 func (p *parameters) ltRow(id int, buffer []uint8) {
 	d, a, b := p.lt_triple(id)
 
@@ -95,6 +127,29 @@ func (p *parameters) g_lt() {
 	}
 }
 
+func (p *parameters) lt_as() {
+	for id := 0; id < p.k; id++ {
+		rowIdx := id + p.s + p.h
+
+		d, a, b := p.lt_triple(id)
+
+		for ; b >= p.l; b = (b + a) % p.lPrime {
+		}
+		p.as.Set(rowIdx, b)
+
+		if d > p.l {
+			d = p.l
+		}
+
+		for j := 1; j < d; j++ {
+			b = (b + a) % p.lPrime
+			for ; b >= p.l; b = (b + a) % p.lPrime {
+			}
+			p.as.Set(rowIdx, b)
+		}
+	}
+}
+
 func (p *parameters) initA() {
 	if p.a != nil {
 		return
@@ -106,6 +161,13 @@ func (p *parameters) initA() {
 	p.g_ldpc()
 	p.g_half()
 	p.g_lt()
+}
+
+func (p *parameters) initAs() {
+
+	p.ldpc_as()
+	p.half_as()
+	p.lt_as()
 }
 
 //For i = 0,.. n, r1[i] = r1[i] ^ r2[i]

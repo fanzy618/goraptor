@@ -12,7 +12,7 @@ func TestK4(t *testing.T) {
 		t.Error(p.String())
 	}
 
-	p.initA()
+	//p.initA()
 	a := [][]uint8{
 		[]uint8{1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		[]uint8{1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -34,6 +34,9 @@ func TestK4(t *testing.T) {
 		for j := 0; j < len(a[0]); j++ {
 			if p.a[i][j] != a[i][j] {
 				t.Errorf("Un-match at %d:%d, where p.a is %d but test case is %d.\n", i, j, p.a[i][j], a[i][j])
+			}
+			if (a[i][j] == 1 && p.as.Has(i, j) == false) || (a[i][j] == 0 && p.as.Has(i, j)) {
+				t.Errorf("Un-match at %d:%d, where a is %d but as is %v.\n", i, j, a[i][j], p.as.Has(i, j))
 			}
 		}
 	}

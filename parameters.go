@@ -2,12 +2,14 @@ package goraptor
 
 import (
 	"fmt"
+	"goraptor/spartmatrix"
 	"math"
 )
 
 type parameters struct {
 	k, x, s, h, l, lPrime int
 	a, ai                 [][]uint8
+	as, ais               *spartmatrix.SpartMatrix
 }
 
 func (p *parameters) String() string {
@@ -86,5 +88,7 @@ func getParameters(k int) (p *parameters) {
 	//For the p that has the same k, matrix a and ai are the same
 	p.initA()
 
+	p.as = spartmatrix.New(p.l, p.l)
+	p.initAs()
 	return p
 }
